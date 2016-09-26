@@ -1,5 +1,6 @@
 import random
 import pickle
+import math
 from collections import defaultdict
 
 import numpy as np
@@ -28,11 +29,39 @@ class City:
 		distance = abs(spatial.distance.euclidean([x, y], [self.center_x, self.center_y]))
 		max_distance = abs(spatial.distance.euclidean([-1, -1], [self.center_x, self.center_y]))
 
-		ratio = 1-distance/max_distance
-		population = self._calculate_population_from_number(ratio)
-		industry_concentration = self._calculate_industry_concentration(ratio, population)
-
 		return Location(population, industry_concentration)
+
+	###
+
+	def _initialize_city_centre(self):
+		previous_coordinates = None
+		for r in range(0, self.width//2):
+			for angle in np.arange(0, 2*math.pi, 0.001):
+				x = round(r*math.cos(angle)+self.center_x)
+				y = round(r*math.sin(angle)+self.center_y)
+
+				assert x in range(0, self.width)
+				assert y in range(0, self.height)
+
+				if (x,y) == previous_coordinates:
+					continue
+
+				#exponent = 0.5
+				coefficient = math.log(4)/(self.width//2)
+				population_variation_range = 0.4
+				industry_variation_range = 0.8
+				self.locations[x][y].population = (1 + random.uniform(-population_variation_range, population_variation_range))*math.exp(-coefficient*r) - math.exp(-coefficient*self.width//2)
+				self.locations[x][y].industry = (0.5 + random.uniform(-industry_variation_range, industry_variation_range))*math.exp(-coefficient*r) - 0.5*math.exp(-coefficient*self.width//2)
+
+				#print(self.locations[x][y].population)
+				#print(self.locations[x][y].industry)
+				#print()
+
+				if self.locations[x][y].population < 0:
+					self.locations[x][y].population = 0
+				if self.locations[x][y].industry < 0:
+					self.locations[x][y].industry = 0
+				previous_coordinates = (x,y)
 
 	@property
 	def population(self):
@@ -89,9 +118,14 @@ class City:
 
 		for w in range(width):
 			for h in range(height):
-				self.locations[w][h] = self._create_location(w, h)
+				self.locations[w][h] = Location(0, 0)
+
+		self._initialize_city_centre()
+		self.plot_population()
+
+		self.pickle(str(width) + "x" + str(height) + "-" + str(target_size) + ".pickle")
 
 class Location:
-	def __init__(self, population, industry_concentration):
+	def __init__(self, population, industry):
 		self.population = population
-		self.industry_concentration = industry_concentration
+		self.industry = industry
